@@ -20,12 +20,13 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  power_save_mode: light
 
 external_components:
   - source: github://jesuli87/esphomeStuff
     components:
       - t547
-    refresh: always
+    refresh: 1d
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -38,6 +39,7 @@ esp32:
       CONFIG_SPIRAM_SPEED_80M: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
       CONFIG_RMT_ENABLE_LEGACY_DRIVER: "y"
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_160: "y"
 
 globals:
   - id: display_page
@@ -47,15 +49,18 @@ globals:
   - id: page_refresh_default_s
     type: int
     restore_value: true
-    initial_value: '60'
+    initial_value: '120'
   - id: page_refresh_current_s
     type: int
     restore_value: false
-    initial_value: '60'
+    initial_value: '120'
   - id: initial_sensor_sync_pending
     type: bool
     restore_value: false
     initial_value: 'true'
+
+deep_sleep:
+  id: deep_sleep_control
 
 time:
   - platform: homeassistant
@@ -318,11 +323,13 @@ script:
             - delay: 5s
             - lambda: 'id(initial_sensor_sync_pending) = false;'
       - lambda: |-
-          int interval = id(page_refresh_default_s);
-          id(page_refresh_current_s) = interval;
+          auto now = id(ha_time).now();
+          int hour = now.is_valid() ? now.hour : 12;
+          int sleep_s = (hour >= 22 || hour < 6) ? 600 : id(page_refresh_default_s);
+          id(page_refresh_current_s) = sleep_s;
       - component.update: my_display
-      - delay: !lambda 'return id(page_refresh_current_s) * 1000;'
-      - script.execute: manage_run_and_sleep
+      - deep_sleep.enter:
+          sleep_duration: !lambda 'return id(page_refresh_current_s) * 1000;'
     
 display:
   - platform: t547
