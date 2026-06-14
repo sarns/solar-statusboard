@@ -167,7 +167,20 @@ sensor:
     id: sensor_temperatursensor_hobbykeller_temperature
     entity_id: sensor.temperatursensor_hobbykeller_temperature
     internal: true
-    
+
+  # Board-eigener Akku: Spannungsteiler (z.B. 100kΩ/100kΩ) an GPIO4 anschliessen.
+  # Teiler-Faktor (multiply) und Pin bei abweichendem Aufbau anpassen.
+  - platform: adc
+    pin: GPIO4
+    id: board_battery_voltage
+    name: "Board Akku Spannung"
+    unit_of_measurement: "V"
+    accuracy_decimals: 2
+    attenuation: 11dB
+    update_interval: never
+    filters:
+      - multiply: 2.0  # 100kΩ/100kΩ-Teiler -> Faktor 2
+
 text_sensor:
 # Weather Forecast Condition Sensors
   - platform: homeassistant
@@ -327,6 +340,14 @@ script:
           int hour = now.is_valid() ? now.hour : 12;
           int sleep_s = (hour >= 22 || hour < 6) ? 600 : id(page_refresh_default_s);
           id(page_refresh_current_s) = sleep_s;
+      - component.update: board_battery_voltage
+      - lambda: |-
+          float v = id(board_battery_voltage).state;
+          ESP_LOGI("battery", "Board Akku: %.2f V", v);
+          if (v < 3.3f) {
+            id(page_refresh_current_s) = 600;
+            ESP_LOGW("battery", "Board Akku kritisch (%.2f V) – Schlafzeit auf 600s erhoehen", v);
+          }
       - component.update: my_display
       - deep_sleep.enter:
           sleep_duration: !lambda 'return id(page_refresh_current_s) * 1000;'
