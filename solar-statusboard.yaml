@@ -20,13 +20,12 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  power_save_mode: light
 
 external_components:
   - source: github://jesuli87/esphomeStuff
     components:
       - t547
-    refresh: 1d
+    refresh: always
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -39,7 +38,6 @@ esp32:
       CONFIG_SPIRAM_SPEED_80M: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
       CONFIG_RMT_ENABLE_LEGACY_DRIVER: "y"
-      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_160: "y"
 
 globals:
   - id: display_page
@@ -49,18 +47,15 @@ globals:
   - id: page_refresh_default_s
     type: int
     restore_value: true
-    initial_value: '120'
+    initial_value: '60'
   - id: page_refresh_current_s
     type: int
     restore_value: false
-    initial_value: '120'
+    initial_value: '60'
   - id: initial_sensor_sync_pending
     type: bool
     restore_value: false
     initial_value: 'true'
-
-deep_sleep:
-  id: deep_sleep_control
 
 time:
   - platform: homeassistant
@@ -166,6 +161,10 @@ sensor:
   - platform: homeassistant
     id: sensor_temperatursensor_hobbykeller_temperature
     entity_id: sensor.temperatursensor_hobbykeller_temperature
+    internal: true
+  - platform: homeassistant
+    id: sensor_temperatursensor_buro_sebastian_temperature
+    entity_id: sensor.temperatursensor_buro_sebastian_temperature
     internal: true
     
 text_sensor:
@@ -323,13 +322,11 @@ script:
             - delay: 5s
             - lambda: 'id(initial_sensor_sync_pending) = false;'
       - lambda: |-
-          auto now = id(ha_time).now();
-          int hour = now.is_valid() ? now.hour : 12;
-          int sleep_s = (hour >= 22 || hour < 6) ? 600 : id(page_refresh_default_s);
-          id(page_refresh_current_s) = sleep_s;
+          int interval = id(page_refresh_default_s);
+          id(page_refresh_current_s) = interval;
       - component.update: my_display
-      - deep_sleep.enter:
-          sleep_duration: !lambda 'return id(page_refresh_current_s) * 1000;'
+      - delay: !lambda 'return id(page_refresh_current_s) * 1000;'
+      - script.execute: manage_run_and_sleep
     
 display:
   - platform: t547
@@ -418,10 +415,10 @@ display:
       };
       int currentPage = id(display_page);
       // ═══════════════════════════════════════════════════════════════
-      // ▸ PAGE: Page 1
+      // ▸ PAGE: Solar_Temp
       // ═══════════════════════════════════════════════════════════════
       if (currentPage == 0) {
-        // page:name "Page 1"
+        // page:name "Solar_Temp"
         // page:dark_mode "inherit"
         // page:refresh_type "interval"
         // page:refresh_time ""
@@ -562,7 +559,7 @@ display:
                   }
                 }
         // ────────────────────────────────────────
-        // widget:rounded_rect id:w_mqapd5o3md64a type:rounded_rect x:280 y:18 w:660 h:160
+        // widget:rounded_rect id:w_mqapd5o3md64a type:rounded_rect x:280 y:19 w:660 h:160
                 {
                   auto draw_rrect_border = [&](int x, int y, int w, int h, int r, int t, auto c) {
                     it.filled_rectangle(x + r, y, w - 2 * r, t, c);
@@ -581,7 +578,7 @@ display:
                       }
                     }
                   };
-                  draw_rrect_border(280, 18, 660, 160, 10, 1, color_on);
+                  draw_rrect_border(280, 19, 660, 160, 10, 1, color_on);
                 }
         // ────────────────────────────────────────
         // widget:datetime id:w_mqakwsvf2sagm type:datetime x:42 y:36 w:196 h:125 time_font_size:64 date_font_size:44 color:"theme_auto"
@@ -629,11 +626,11 @@ display:
                   print_wrapped_text(250, 220, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
                 }
         // ────────────────────────────────────────
-        // widget:sensor_text id:w_mqaqo986mewic type:sensor_text x:309 y:220 w:130 h:50 entity:sensor.dtu_ac_power value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
+        // widget:sensor_text id:w_mqaqo986mewic type:sensor_text x:300 y:220 w:130 h:50 entity:sensor.dtu_ac_power value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
                 {
                   char wrap_buf[512];
                   sprintf(wrap_buf, "%.0f W", id(sensor_dtu_ac_power).state);
-                  print_wrapped_text(439, 220, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
+                  print_wrapped_text(430, 220, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
                 }
         // ────────────────────────────────────────
         // widget:sensor_text id:w_mqaqr5f775uoj type:sensor_text x:120 y:300 w:130 h:50 entity:sensor.solarnet_power_grid_import value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
@@ -650,11 +647,11 @@ display:
                   print_wrapped_text(250, 375, 130, 41, id(font_roboto_400_37), color_on, TextAlign::TOP_RIGHT, wrap_buf);
                 }
         // ────────────────────────────────────────
-        // widget:sensor_text id:w_mqaqxgcol26k2 type:sensor_text x:309 y:300 w:130 h:50 entity:sensor.solarnet_power_grid_export value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
+        // widget:sensor_text id:w_mqaqxgcol26k2 type:sensor_text x:300 y:300 w:130 h:50 entity:sensor.solarnet_power_grid_export value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
                 {
                   char wrap_buf[512];
                   sprintf(wrap_buf, "%.0f W", id(sensor_solarnet_power_grid_export).state);
-                  print_wrapped_text(439, 300, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
+                  print_wrapped_text(430, 300, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
                 }
         // ────────────────────────────────────────
         // widget:sensor_text id:w_mqaqz93j84iqd type:sensor_text x:120 y:450 w:130 h:50 entity:sensor.solarnet_power_battery_charge value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
@@ -664,11 +661,11 @@ display:
                   print_wrapped_text(250, 450, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
                 }
         // ────────────────────────────────────────
-        // widget:sensor_text id:w_mqar06rzzjt1m type:sensor_text x:309 y:450 w:130 h:50 entity:sensor.solarnet_power_battery_discharge value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
+        // widget:sensor_text id:w_mqar06rzzjt1m type:sensor_text x:300 y:450 w:130 h:50 entity:sensor.solarnet_power_battery_discharge value_format:"value_only" label_font_size:18 value_font_size:38 precision:0 text_align:"TOP_RIGHT" label_align:"TOP_RIGHT" value_align:"TOP_RIGHT"
                 {
                   char wrap_buf[512];
                   sprintf(wrap_buf, "%.0f W", id(sensor_solarnet_power_battery_discharge).state);
-                  print_wrapped_text(439, 450, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
+                  print_wrapped_text(430, 450, 130, 42, id(font_roboto_400_38), color_on, TextAlign::TOP_RIGHT, wrap_buf);
                 }
         // ────────────────────────────────────────
         // widget:battery_icon id:w_mqar1ld8z8mkk type:battery_icon x:40 y:453 w:60 h:60 entity:sensor.reserva_state_of_charge is_local_sensor:false
@@ -709,8 +706,8 @@ display:
         // widget:label id:w_mqaurpqvwfi4i type:label x:120 y:438 w:130 h:30 text:"Ladung" font_size:16
                 it.printf(120, 438, id(font_roboto_400_16), color_on, TextAlign::TOP_LEFT, "Ladung");
         // ────────────────────────────────────────
-        // widget:label id:w_mqaus2ryyzggy type:label x:314 y:438 w:130 h:30 text:"Entladung" font_size:16
-                it.printf(314, 438, id(font_roboto_400_16), color_on, TextAlign::TOP_LEFT, "Entladung");
+        // widget:label id:w_mqaus2ryyzggy type:label x:314 y:445 w:130 h:30 text:"Entladung" font_size:16
+                it.printf(314, 445, id(font_roboto_400_16), color_on, TextAlign::TOP_LEFT, "Entladung");
         // ────────────────────────────────────────
         // widget:sensor_text id:w_mqavljvce9m97 type:sensor_text x:516 y:325 w:113 h:95 entity:sensor.temperatursensor_garten_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
                 it.printf(516, 325 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Garten");
@@ -725,12 +722,12 @@ display:
                 it.printf(807, 325 + 0 + 32, id(font_roboto_400_30), color_on, TextAlign::TOP_LEFT, "%.1f °C", id(sensor_temperatursensor_kuche_temperature).state);
         // ────────────────────────────────────────
         // widget:sensor_text id:w_mqavq4o6yqmjh type:sensor_text x:516 y:220 w:186 h:95 entity:sensor.temperatursensor_schlafzimmer_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
-                it.printf(516, 220 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Schlafzimmer");
+                it.printf(516, 220 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Eltern");
                 it.printf(516, 220 + 0 + 32, id(font_roboto_400_30), color_on, TextAlign::TOP_LEFT, "%.1f °C", id(sensor_temperatursensor_schlafzimmer_temperature).state);
         // ────────────────────────────────────────
-        // widget:sensor_text id:w_mqavrns50wq0l type:sensor_text x:734 y:220 w:186 h:95 entity:sensor.temperatursensor_kinderzimmer_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
-                it.printf(734, 220 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Kinderzimmer");
-                it.printf(734, 220 + 0 + 32, id(font_roboto_400_30), color_on, TextAlign::TOP_LEFT, "%.1f °C", id(sensor_temperatursensor_kinderzimmer_temperature).state);
+        // widget:sensor_text id:w_mqavrns50wq0l type:sensor_text x:659 y:220 w:113 h:95 entity:sensor.temperatursensor_kinderzimmer_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
+                it.printf(659, 220 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Kinder");
+                it.printf(659, 220 + 0 + 32, id(font_roboto_400_30), color_on, TextAlign::TOP_LEFT, "%.1f °C", id(sensor_temperatursensor_kinderzimmer_temperature).state);
         // ────────────────────────────────────────
         // widget:sensor_text id:w_mqavuossafd2v type:sensor_text x:516 y:428 w:186 h:95 entity:sensor.temperatursensor_technikraum_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
                 it.printf(516, 428 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Technikraum");
@@ -739,4 +736,8 @@ display:
         // widget:sensor_text id:w_mqavvv9n6y97t type:sensor_text x:734 y:428 w:186 h:95 entity:sensor.temperatursensor_hobbykeller_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
                 it.printf(734, 428 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Hobbykeller");
                 it.printf(734, 428 + 0 + 32, id(font_roboto_400_30), color_on, TextAlign::TOP_LEFT, "%.1f °C", id(sensor_temperatursensor_hobbykeller_temperature).state);
+        // ────────────────────────────────────────
+        // widget:sensor_text id:w_mqny26hg7ifq1 type:sensor_text x:807 y:220 w:113 h:95 entity:sensor.temperatursensor_buro_sebastian_temperature value_format:"label_newline_value" label_font_size:28 value_font_size:30 precision:1 border_radius:10
+                it.printf(807, 220 + 0, id(font_roboto_400_28), color_on, TextAlign::TOP_LEFT, "Buro");
+                it.printf(807, 220 + 0 + 32, id(font_roboto_400_30), color_on, TextAlign::TOP_LEFT, "%.1f °C", id(sensor_temperatursensor_buro_sebastian_temperature).state);
       }
